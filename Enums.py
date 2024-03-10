@@ -1,4 +1,5 @@
 from web3 import Web3
+import time
 
 
 # Addresses Enum
@@ -30,6 +31,17 @@ class Endpoints:
 
     class ETHERSCAN:
 
-        ABI = (
-            lambda adrs: f"https://api.etherscan.io/api?module=contract&action=getabi&address={adrs}&apikey={APIs.ETHERSCAN}"
-        )  # Contract ABI
+        def ABI(adrs):
+            """
+            Return Etherscan ABI URL endpoint for contract 'adrs'
+
+            Args:
+            adrs: (string) Contract address
+
+            Returns:
+            (string) URL endpoint for contract's ABI
+            """
+
+            time.sleep(0.3)  # Obey 5 cps rate limit
+
+            return f"https://api.etherscan.io/api?module=contract&action=getabi&address={adrs}&apikey={APIs.ETHERSCAN}"

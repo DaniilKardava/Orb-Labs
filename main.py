@@ -1,7 +1,8 @@
-from web3 import Web3
+from web3 import Web3, AsyncHTTPProvider, AsyncWeb3
 import requests
 from proxy_patterns import EIP_1997, OpenZeppelin
 import Enums
+import asyncio
 
 # Create enums
 Addresses = Enums.Addresses
@@ -9,7 +10,7 @@ APIs = Enums.APIs
 Endpoints = Enums.Endpoints
 
 
-def get_implementation_address(proxy) -> str:
+async def get_implementation_address(proxy) -> str:
     """
     Return the implementation address of a proxy contract.
 
@@ -17,10 +18,12 @@ def get_implementation_address(proxy) -> str:
     proxy: (string) Proxy address.
     """
 
-    implementation_address = EIP_1997(w3, proxy)  # Try EIP standard
+    implementation_address = await EIP_1997(w3, proxy)  # Try EIP standard
 
     if implementation_address == "0x0":
-        implementation_address = OpenZeppelin(w3, proxy)  # Try OpenZeppelin standard
+        implementation_address = await OpenZeppelin(
+            w3, proxy
+        )  # Try OpenZeppelin standard
 
     if implementation_address == "0x0":
         return proxy
@@ -30,7 +33,7 @@ def get_implementation_address(proxy) -> str:
     return implementation_address
 
 
-def get_abi(url_endpoint) -> list[dict]:
+async def get_abi(url_endpoint) -> list[dict]:
     """
     Args:
     API string endpoint
@@ -39,10 +42,12 @@ def get_abi(url_endpoint) -> list[dict]:
     List of dictionaries containing contract method signatures.
     """
 
-    return requests.get(url_endpoint).json()["result"]
+    response = await asyncio.to_thread(requests.get, url_endpoint)
+
+    return response.json()["result"]
 
 
-def get_contract(address):
+async def get_contract(address):
     """
     Returns contract instance.
 
@@ -53,31 +58,33 @@ def get_contract(address):
     w3.eth.contract instance
     """
 
-    abi_address = get_implementation_address(address)
+    abi_address = await get_implementation_address(address)
+    abi = await get_abi(Endpoints.ETHERSCAN.ABI(abi_address))
 
-    return w3.eth.contract(address, abi=get_abi(Endpoints.ETHERSCAN.ABI(abi_address)))
+    return w3.eth.contract(address, abi=abi)
 
 
-def main():
+async def main():
 
     global w3
 
-    w3 = Web3(Web3.HTTPProvider(Endpoints.INFURA))
+    w3 = AsyncWeb3(AsyncHTTPProvider(Endpoints.INFURA))
 
     # Get proxy contract.
-    proxy_contract = get_contract(Addresses.Aave.Mainnet.POOL_PROXY)
+    proxy_contract = await get_contract(Addresses.Aave.Mainnet.POOL_PROXY)
 
-    # Print reserves
-    reserves = proxy_contract.functions.getReservesList().call()
-    names = list(
-        map(
-            lambda a: get_contract(a).functions.name().call(),
-            reserves,
-        )
+    # Print tokens
+    tokens = await proxy_contract.functions.getReservesList().call()
+
+    print(tokens)
+
+    token_contracts = await asyncio.gather(*[get_contract(a) for a in tokens])
+    token_names = await asyncio.gather(
+        *[contract.functions.name().call() for contract in token_contracts]
     )
-    print(names)
+    print(token_names)
 
 
 if __name__ == "__main__":
 
-    main()
+    asyncio.run(main())
