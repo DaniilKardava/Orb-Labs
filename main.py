@@ -1,39 +1,12 @@
 from web3 import Web3
 import requests
+from proxy_patterns import EIP_1997, OpenZeppelin
+import Enums
 
-
-# Addresses Enum
-class Addresses:
-
-    PERSONAL = Web3.to_checksum_address("0x3B3C3f31DAe1FD6d056f67fB2D0ea2FD3217AD67")
-
-    class Aave:
-
-        class Mainnet:
-
-            POOL_PROXY = Web3.to_checksum_address(
-                "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
-            )
-
-
-# API Keys Enum
-class APIs:
-
-    INFURA = "6ad6c314a07247839facdd2943580991"  # Node provider
-
-    ETHERSCAN = "WHV2VBD8YJZCNJEBI65QZ7QQKBESDKH89F"  # API key for ABI requests
-
-
-# URL Enum
-class Endpoints:
-
-    INFURA = f"https://mainnet.infura.io/v3/{APIs.INFURA}"  # Infura node provider
-
-    class ETHERSCAN:
-
-        ABI = (
-            lambda adrs: f"https://api.etherscan.io/api?module=contract&action=getabi&address={adrs}&apikey={APIs.ETHERSCAN}"
-        )  # Contract ABI
+# Create enums
+Addresses = Enums.Addresses
+APIs = Enums.APIs
+Endpoints = Enums.Endpoints
 
 
 def get_implementation_address(proxy) -> str:
@@ -44,34 +17,13 @@ def get_implementation_address(proxy) -> str:
     proxy: (string) Proxy address.
     """
 
-    # EIP-1967 Transparent Proxy Pattern
-    IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"  # Standard memory address for storing implementation address
+    implementation_address = EIP_1997(w3, proxy)  # Try EIP standard
 
-    implementation_address = Web3.to_hex(
-        w3.eth.get_storage_at(
-            proxy,
-            IMPLEMENTATION_SLOT,
-        )
-    )
-
-    implementation_address = hex(
-        int(implementation_address, 16)
-    )  # Remove leading zeroes
-
-    # OpenZeppelin's Unstructured Storage Pattern
     if implementation_address == "0x0":
+        implementation_address = OpenZeppelin(w3, proxy)  # Try OpenZeppelin standard
 
-        abi = get_abi(Endpoints.ETHERSCAN.ABI(proxy))  # Get proxy abi
-        contract = w3.eth.contract(proxy, abi=abi)  # Get proxy contract
-
-        print(abi)
-        print(contract.address)
-
-        try:
-            implementation_address = contract.functions.implementation().call()
-        except Exception as e:
-            print(e)
-            return proxy
+    if implementation_address == "0x0":
+        return proxy
 
     implementation_address = Web3.to_checksum_address(implementation_address)
 
@@ -101,9 +53,8 @@ def get_contract(address):
     w3.eth.contract instance
     """
 
-    print(address)
     abi_address = get_implementation_address(address)
-    print(abi_address)
+
     return w3.eth.contract(address, abi=get_abi(Endpoints.ETHERSCAN.ABI(abi_address)))
 
 
