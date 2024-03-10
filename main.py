@@ -3,6 +3,7 @@ import requests
 from proxy_patterns import EIP_1997, OpenZeppelin
 import Enums
 import asyncio
+import time
 
 # Create enums
 Addresses = Enums.Addresses
@@ -42,6 +43,8 @@ async def get_abi(url_endpoint) -> list[dict]:
     List of dictionaries containing contract method signatures.
     """
 
+    time.sleep(0.25)  # Blocking sleep to obey 5 cps rate limit
+
     response = await asyncio.to_thread(requests.get, url_endpoint)
 
     return response.json()["result"]
@@ -64,6 +67,80 @@ async def get_contract(address):
     return w3.eth.contract(address, abi=abi)
 
 
+def from_ray(val):
+    """
+    Convert from ray units. A ray is a int representing a floating point with 27 decimal points of precision
+
+    Args:
+    val: (int) value in ray units.
+
+    Returns:
+    (int) Value in standard units.
+    """
+
+    return val / 1e27
+
+
+async def get_token_contracts(addresses):
+    """
+    Return token contracts at given addresses
+
+    Args:
+    addresses: (list[string]) List of string addresses of tokens
+
+    Return:
+    (list[contracts]) List of token contract objects
+    """
+    token_contracts = await asyncio.gather(*[get_contract(a) for a in addresses])
+
+    return token_contracts
+
+
+async def get_token_names(contracts):
+    """
+    Get token names from token contracts.
+
+    Args:
+    contracts: (list[contracts]) List of token contracts
+
+    Returns:
+    list(strings) List of string names of tokens
+    """
+
+    token_names = await asyncio.gather(
+        *[contract.functions.name().call() for contract in contracts]
+    )
+
+    return token_names
+
+
+async def get_tokens_rates(proxy, addresses):
+    """
+    Returns borrow and yield rates (%) for Aave tokens.
+
+    Args:
+    proxy: (contract) Aave pool proxy contract instance
+    addresses: ([string]) List of token addresses
+
+    Returns:
+    ([{str : int, str : int}]) List of dictionaries containing lend and borrow rates.
+    """
+
+    token_info = await asyncio.gather(
+        *[proxy.functions.getReserveData(address).call() for address in addresses]
+    )  # Preserves order of async calls
+
+    token_rates = map(
+        lambda info: {
+            "lend_rate": from_ray(info[2]) * 100,
+            "borrow_rate": from_ray(info[4]) * 100,
+        },
+        token_info,
+    )
+
+    return list(token_rates)
+
+
 async def main():
 
     global w3
@@ -73,16 +150,19 @@ async def main():
     # Get proxy contract.
     proxy_contract = await get_contract(Addresses.Aave.Mainnet.POOL_PROXY)
 
-    # Print tokens
-    tokens = await proxy_contract.functions.getReservesList().call()
+    token_addresses = (
+        await proxy_contract.functions.getReservesList().call()
+    )  # Get token addresses
 
-    print(tokens)
+    token_contracts = await get_token_contracts(token_addresses)
 
-    token_contracts = await asyncio.gather(*[get_contract(a) for a in tokens])
-    token_names = await asyncio.gather(
-        *[contract.functions.name().call() for contract in token_contracts]
-    )
-    print(token_names)
+    token_names = await get_token_names(token_contracts)
+
+    token_rates = await get_tokens_rates(proxy_contract, token_addresses)
+
+    rate_dict = {k: v for k, v in zip(token_names, token_rates)}
+
+    print(rate_dict)
 
 
 if __name__ == "__main__":
