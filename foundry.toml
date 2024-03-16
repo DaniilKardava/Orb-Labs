@@ -5,7 +5,7 @@ libs = ["lib"]
 remappings = [
     "forge-std/=lib/forge-std/src", 
     "solmate/=lib/solmate/src",
-    "OpenZepellin/=lib/OpenZepellin/src",
+    "OpenZepellin/=lib/OpenZepellin/contracts",
 ]
 root = "."
 
