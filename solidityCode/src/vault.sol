@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {ERC20, IERC20, ERC4626} from "OpenZepellin/token/ERC20/repo.sol";
+import {ERC20} from "OpenZepellin/token/ERC20/ERC20.sol";
+import {IERC20} from "OpenZepellin/token/ERC20/IERC20.sol";
+import {ERC4626} from "OpenZepellin/token/ERC20/extensions/ERC4626.sol";
 
 contract tokenVault is ERC4626 {
     /// @notice Deposit too small. Called with "amount".
