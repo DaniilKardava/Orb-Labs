@@ -33,3 +33,7 @@ class Endpoints:
         ABI = (
             lambda a: f"https://api.etherscan.io/api?module=contract&action=getabi&address={a}&apikey={APIs.ETHERSCAN}"
         )  # Get url endpoint for abi specification on etherscan
+
+    class THE_GRAPH:
+
+        AAVE_V3 = "https://api.thegraph.com/subgraphs/name/aave/protocol-v3"
