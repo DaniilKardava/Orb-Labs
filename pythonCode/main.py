@@ -43,7 +43,7 @@ async def get_abi(url_endpoint) -> list[dict]:
     List of dictionaries containing contract method signatures.
     """
 
-    time.sleep(0.25)  # Blocking sleep to obey 5 cps rate limit
+    time.sleep(0.3)  # Blocking sleep to obey 5 cps rate limit
 
     response = await asyncio.to_thread(requests.get, url_endpoint)
 

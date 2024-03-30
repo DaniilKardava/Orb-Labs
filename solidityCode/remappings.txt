@@ -1,0 +1,5 @@
+forge-std/=lib/forge-std/src/
+solmate/=lib/solmate/src/
+OpenZepellin/=lib/OpenZepellin/contracts/
+ds-math/=lib/ds-math/src/
+eigenlayer-contracts/=lib/eigenlayer-contracts/src/
