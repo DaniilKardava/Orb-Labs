@@ -7,3 +7,9 @@
 [submodule "solidityCode/lib/OpenZepellin"]
 	path = solidityCode/lib/OpenZepellin
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts.git
+[submodule "solidityCode/lib/ds-math"]
+	path = solidityCode/lib/ds-math
+	url = https://github.com/dapphub/ds-math.git
+[submodule "solidityCode/lib/eigenlayer-contracts"]
+	path = solidityCode/lib/eigenlayer-contracts
+	url = https://github.com/Layr-Labs/eigenlayer-contracts.git
