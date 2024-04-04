@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.12;
 
-contract WithdrawalQueue {
+contract EigenWithdrawalQueue {
     /// COPIED FROM EIGENLAYER
     struct WithdrawerAndNonce {
         address withdrawer;
@@ -30,10 +30,9 @@ contract WithdrawalQueue {
         QueuedWithdrawal order;
     }
 
-    Node internal headNode;
-    Node internal tailNode;
     uint256 internal length;
-    int256 internal headIndex; // For deleting.
+    int256 internal headIndex;
+    int256 internal tailIndex;
 
     mapping(int256 => Node) internal withdrawals;
 
@@ -50,8 +49,9 @@ contract WithdrawalQueue {
     ) public virtual {
         Node memory newNode = Node(tailNode.next + 1, root, queuedWithdrawal);
 
-        withdrawals[tailNode.next] = newNode;
-        tailNode = newNode;
+        int256 freeIndex = withdrawals[tailIndex].next;
+        withdrawals[freeIndex] = newNode;
+        tailIndex = freeIndex;
 
         length++;
     }
@@ -71,8 +71,8 @@ contract WithdrawalQueue {
     /**
      * Returns front of queue.
      */
-    function peek() public returns (Node) {
-        return headNode;
+    function peek() public view returns (Node memory) {
+        return withdrawals[headIndex];
     }
 
     /**
@@ -80,5 +80,20 @@ contract WithdrawalQueue {
      */
     function getLength() public returns (uint256) {
         return length;
+    }
+
+    /**
+     * Returns the total amount being withdrawan from EigenLayer in EigenLayer shares.
+     */
+    function sumPendingWithdrawalsInShares()
+        public
+        returns (uint256 pendingWithdrawals)
+    {
+        uint256 pendingWithdrawals;
+        int256 index = headIndex;
+        while (withdrawals[index].order.depositor != address(0)) {
+            pendingWithdrawals += withdrawals[index].order.shares[0];
+            index = withdrawals[index].next;
+        }
     }
 }
