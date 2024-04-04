@@ -2,32 +2,36 @@
 pragma solidity ^0.8.12;
 
 import {VaultBase} from "./abstracts/VaultBase.sol";
-import {IERC20} from "lib/OpenZepellin/contracts/token/ERC20/IERC20.sol";
-import {ERC20} from "lib/OpenZepellin/contracts/token/ERC20/ERC20.sol";
-import {ERC4626} from "lib/OpenZepellin/contracts/token/ERC20/extensions/ERC4626.sol";
-import {Ownable} from "lib/OpenZepellin/contracts/access/Ownable.sol";
-import {IStrategy} from "lib/eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {StrategyManager} from "lib/eigenlayer-contracts/src//contracts/core/StrategyManager.sol";
+import {IERC20} from "../lib/OpenZepellin/contracts/token/ERC20/IERC20.sol";
+import {ERC20} from "../lib/OpenZepellin/contracts/token/ERC20/ERC20.sol";
+import {ERC4626} from "../lib/OpenZepellin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {Ownable} from "../lib/OpenZepellin/contracts/access/Ownable.sol";
+import {IStrategy} from "../lib/eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {StrategyManager} from "../lib/eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
 import {VaultWithdrawalQueue} from "./VaultWithdrawalQueue.sol";
 import {VaultPriorityWithdrawalQueue} from "./VaultPriorityWithdrawalQueue.sol";
 import {EigenWithdrawalQueue} from "./EigenWithdrawalQueue.sol";
+import {SafeERC20} from "../lib/OpenZepellin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {DSMath} from "../lib/ds-math/src/math.sol";
 
 contract Vault is VaultBase {
     constructor(
         IERC20 asset,
         string memory name,
         string memory symbol,
-        VaultConfig memory configArg,
+        VaultConfig memory vaultConfigArg,
         EigenContracts memory eigenContractsArg,
         address vaultOwner
-    ) ERC4626(asset) ERC20(name, symbol) Ownable(vaultOwner) {
-        vaultConfig = configArg;
-        eigenContracts = eigenContractsArg;
-        vaultPriorityWithdrawalQueue = new VaultPriorityWithdrawalQueue();
-        vaultWithdrawalQueue = new VaultWithdrawalQueue();
-        eigenWithdrawalQueue = new EigenWithdrawalQueue();
-        nonce = 0;
-    }
+    )
+        VaultBase(
+            asset,
+            name,
+            symbol,
+            vaultConfigArg,
+            eigenContractsArg,
+            vaultOwner
+        )
+    {}
 
     function queueVaultWithdrawal(
         uint256 assets,
@@ -45,7 +49,7 @@ contract Vault is VaultBase {
                 .sumPendingWithdrawals();
             uint256 pendingEigenWithdrawalsInShares = eigenWithdrawalQueue
                 .sumPendingWithdrawalsInShares();
-            uint256 pendingEigenWithdrawalInAssets = eigenContracts
+            uint256 pendingEigenWithdrawalsInAssets = eigenContracts
                 .strategyProxy
                 .sharesToUnderlyingView(pendingEigenWithdrawalsInShares);
 
@@ -69,24 +73,22 @@ contract Vault is VaultBase {
     function eigenDeposit() public override {
         if (canEigenDeposit()) {
             uint256 surplus = calculateReserveSurplus();
-            uint256 eigenShares = eigenContracts
-                .strategyManagerProxy
-                .depositIntoStrategy(
-                    eigenContracts.strategyProxy,
-                    _asset,
-                    surplus
-                );
+            eigenContracts.strategyManagerProxy.depositIntoStrategy(
+                eigenContracts.strategyProxy,
+                getAssetContract(),
+                surplus
+            );
         }
     }
 
-    function checkEigenWithdrawal() internal override returns (bool) {
+    function checkEigenWithdrawal() public view override returns (bool) {
         return
             eigenContracts.strategyManagerProxy.withdrawalRootPending[
                 eigenWithdrawalQueue.peek().root
             ];
     }
 
-    function completeVaultWithdrawals() public {
+    function completeVaultWithdrawals() public override {
         while (
             (eigenWithdrawalQueue.getLength() > 0) && checkEigenWithdrawal()
         ) {
@@ -99,66 +101,64 @@ contract Vault is VaultBase {
     }
 
     function calculateDepositThreshold(
-        uint256 TVL
-    ) internal virtual returns (uint256 depositThreshold) {
-        uint256 depositThreshold = DSMath.wmul(
-            TVL,
+        uint256 totalValueLocked
+    ) public view override returns (uint256 depositThreshold) {
+        depositThreshold = DSMath.wmul(
+            totalValueLocked,
             vaultConfig.depositThreshold
         );
     }
 
     function calculateReserveThreshold(
-        uint256 TVL
-    ) internal virtual returns (uint256 reserveThreshold) {
-        uint256 reserveThreshold = DSMath.wmul(
-            TVL,
+        uint256 totalValueLocked
+    ) public view override returns (uint256 reserveThreshold) {
+        reserveThreshold = DSMath.wmul(
+            totalValueLocked,
             vaultConfig.reserveRequirement
         );
     }
 
     function calculateReserveSurplus()
-        internal
-        virtual
+        public
+        view
+        override
         returns (uint256 surplus)
     {
-        uint256 surplus = getReserves() -
-            calculateReserveThreshold(totalValueLocked);
+        surplus = getReserves() - calculateReserveThreshold(totalAssets());
         if (surplus < 0) {
             surplus = 0;
         }
     }
 
-    function canEigenDeposit() internal virtual returns (bool) {
+    function canEigenDeposit() public view override returns (bool) {
         return (getReserves() > calculateDepositThreshold(totalAssets()));
     }
 
-    function getEigenAssets() public override returns (uint256 assets) {
+    function getEigenAssets() public view override returns (uint256 assets) {
         uint256 shares = getEigenShares();
-        uint256 assets = eigenContracts.strategyProxy.sharesToUnderlyingView(
-            shares
-        );
+        assets = eigenContracts.strategyProxy.sharesToUnderlyingView(shares);
     }
 
-    function getEigenShares() public override returns (uint256 shares) {
-        uint256 shares = eigenContracts
-            .strategyManagerProxy
-            .stakerStrategyShares[address(this)][eigenContracts.strategyProxy];
+    function getEigenShares() public view override returns (uint256 shares) {
+        shares = eigenContracts.strategyManagerProxy.stakerStrategyShares[
+            address(this)
+        ][eigenContracts.strategyProxy];
     }
 
-    function getReserves() public override returns (uint256 reserves) {
-        return _asset.balanceOf(address(this));
+    function getReserves() public view override returns (uint256) {
+        return getAssetContract().balanceOf(address(this));
     }
 
     function checkAndReturnShares(
         uint256 assets,
         address owner
-    ) public returns (uint256 shares) {
-        uint256 maxAssets = maxWithdraw(owner);
-        if (assets > maxAssets) {
-            revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
-        }
+    ) public view override returns (uint256 shares) {
+        require(
+            assets <= maxWithdraw(owner),
+            "ERC4626: withdraw more than max"
+        );
 
-        uint256 shares = previewWithdraw(assets);
+        shares = previewWithdraw(assets);
 
         if (msg.sender != owner) {
             _spendAllowance(owner, msg.sender, shares);
@@ -170,12 +170,16 @@ contract Vault is VaultBase {
      */
     function totalAssets() public view override returns (uint256) {
         return
-            _asset.balanceOf(address(this)) +
+            getAssetContract().balanceOf(address(this)) +
             getEigenAssets() -
             vaultPriorityWithdrawalQueue.sumPendingWithdrawals();
     }
 
     // ====== Internal Methods ====== //
+
+    function getAssetContract() internal view override returns (IERC20) {
+        return IERC20(asset());
+    }
 
     function queueEigenWithdraw(uint256 assets) internal override {
         uint256 shares = eigenContracts.strategyProxy.underlyingToSharesView(
@@ -214,7 +218,7 @@ contract Vault is VaultBase {
     function completeEigenWithdrawal() internal override {
         eigenContracts.strategyManagerProxy.completeWithdrawal(
             eigenWithdrawalQueue.peek(),
-            [_asset],
+            [getAssetContract()],
             0,
             true
         );
@@ -225,8 +229,8 @@ contract Vault is VaultBase {
         uint256 assets,
         address receiver,
         address owner
-    ) internal returns (uint256 shares) {
-        uint256 shares = checkAndReturnShares(assets, owner);
+    ) internal override returns (uint256 shares) {
+        shares = checkAndReturnShares(assets, owner);
 
         _burn(owner, shares);
 
@@ -241,7 +245,7 @@ contract Vault is VaultBase {
             (getReserves() > vaultPriorityWithdrawalQueue.peek().order.amount)
         ) {
             SafeERC20.safeTransfer(
-                _asset,
+                getAssetContract(),
                 vaultPriorityWithdrawalQueue.peek().order.account,
                 vaultPriorityWithdrawalQueue.peek().order.amount
             );
@@ -258,7 +262,7 @@ contract Vault is VaultBase {
             (getReserves() > vaultWithdrawalQueue.peek().order.amount)
         ) {
             SafeERC20.safeTransfer(
-                _asset,
+                getAssetContract(),
                 vaultWithdrawalQueue.peek().order.account,
                 vaultWithdrawalQueue.peek().order.amount
             );
@@ -267,13 +271,5 @@ contract Vault is VaultBase {
             );
             vaultWithdrawalQueue.dequeue();
         }
-    }
-
-    // ====== Owner Methods ====== //
-
-    function updateVaultConfig(
-        VaultConfig memory vaultConfigArg
-    ) public override onlyOwner {
-        vaultConfig = vaultConfigArg;
     }
 }

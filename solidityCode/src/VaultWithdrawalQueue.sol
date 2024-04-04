@@ -48,8 +48,9 @@ contract VaultWithdrawalQueue {
     function dequeue() public virtual {
         require(getLength() > 0, "Empty queue!");
 
+        int256 tempHeadIndex = withdrawals[headIndex].next;
         delete withdrawals[headIndex];
-        headIndex++;
+        headIndex = tempHeadIndex;
         length--;
     }
 

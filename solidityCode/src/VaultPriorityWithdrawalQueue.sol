@@ -77,7 +77,6 @@ contract VaultPriorityWithdrawalQueue is VaultWithdrawalQueue {
         view
         returns (uint256 pendingWithdrawals)
     {
-        uint256 pendingWithdrawals;
         int256 index = headIndex;
         while (withdrawals[index].order.account != address(0)) {
             pendingWithdrawals += withdrawals[index].order.assets;

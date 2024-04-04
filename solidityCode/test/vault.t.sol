@@ -2,7 +2,7 @@
 pragma solidity =0.8.12;
 
 import {Test, console} from "lib/forge-std/src/Test.sol";
-import {tokenVault} from "src/Vault.sol";
+import {Vault} from "src/Vault.sol";
 import {IERC20} from "lib/OpenZepellin/contracts/token/ERC20/IERC20.sol";
 
 contract vaultTest is Test {

@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.12;
 
-import {IERC20} from "lib/OpenZepellin/contracts/token/ERC20/IERC20.sol";
-import {ERC20} from "lib/OpenZepellin/contracts/token/ERC20/ERC20.sol";
-import {ERC4626} from "lib/OpenZepellin/contracts/token/ERC20/extensions/ERC4626.sol";
-import {Ownable} from "lib/OpenZepellin/contracts/access/Ownable.sol";
-import {IStrategy} from "lib/eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {StrategyManager} from "lib/eigenlayer-contracts/src//contracts/core/StrategyManager.sol";
+import {IERC20} from "../../lib/OpenZepellin/contracts/token/ERC20/IERC20.sol";
+import {ERC20} from "../../lib/OpenZepellin/contracts/token/ERC20/ERC20.sol";
+import {ERC4626} from "../../lib/OpenZepellin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {Ownable} from "../../lib/OpenZepellin/contracts/access/Ownable.sol";
+import {IStrategy} from "../../lib/eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {StrategyManager} from "../../lib/eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
 import {VaultWithdrawalQueue} from "../VaultWithdrawalQueue.sol";
 import {VaultPriorityWithdrawalQueue} from "../VaultPriorityWithdrawalQueue.sol";
 import {EigenWithdrawalQueue} from "../EigenWithdrawalQueue.sol";
+import {DSMath} from "../../lib/ds-math/src/math.sol";
 
 /**
  * Abstract Vault contract for token and EigenLayer strategy.
@@ -56,7 +57,7 @@ abstract contract VaultBase is ERC4626, Ownable {
     }
 
     VaultConfig public vaultConfig;
-    EigenContracts public immutable eigenContracts;
+    EigenContracts public eigenContracts;
     VaultPriorityWithdrawalQueue internal vaultPriorityWithdrawalQueue;
     VaultWithdrawalQueue internal vaultWithdrawalQueue;
     EigenWithdrawalQueue internal eigenWithdrawalQueue;
@@ -76,10 +77,18 @@ abstract contract VaultBase is ERC4626, Ownable {
         IERC20 asset,
         string memory name,
         string memory symbol,
-        VaultConfig memory configArg,
+        VaultConfig memory vaultConfigArg,
         EigenContracts memory eigenContractsArg,
         address vaultOwner
-    ) ERC4626(asset) ERC20(name, symbol) Ownable(vaultOwner);
+    ) ERC4626(asset) ERC20(name, symbol) {
+        transferOwnership(vaultOwner);
+        vaultConfig = vaultConfigArg;
+        eigenContracts = eigenContractsArg;
+        vaultPriorityWithdrawalQueue = new VaultPriorityWithdrawalQueue();
+        vaultWithdrawalQueue = new VaultWithdrawalQueue();
+        eigenWithdrawalQueue = new EigenWithdrawalQueue();
+        nonce = 0;
+    }
 
     // ====== Public Methods ====== //
 
@@ -99,9 +108,8 @@ abstract contract VaultBase is ERC4626, Ownable {
 
     /**
      * Deposit surplus reserves into EigenLayer. Refund caller gas.
-     * @param assets Amount of assets to deposit to EigenLayer.
      */
-    function eigenDeposit(uint256 assets) public virtual;
+    function eigenDeposit() public virtual;
 
     /**
      * Checks the status of the first EigenLayer withdrawal in queue.
@@ -115,20 +123,20 @@ abstract contract VaultBase is ERC4626, Ownable {
 
     /**
      * Calculates excess reserves required to trigger deposit to EigenLayer based on Vault configuration.
-     * @param TVL Hypothetical total value locked.
+     * @param totalValueLocked Hypothetical total value locked.
      * @return depositThreshold Amount needed to trigger deposit.
      */
     function calculateDepositThreshold(
-        uint256 TVL
+        uint256 totalValueLocked
     ) public view virtual returns (uint256 depositThreshold);
 
     /**
      * Calculates target reserves based on Vault configuration.
-     * @param TVL Hypothetical total value locked.
+     * @param totalValueLocked Hypothetical total value locked.
      * @return reserveThreshold Target reserves to serve withdrawals.
      */
     function calculateReserveThreshold(
-        uint256 TVL
+        uint256 totalValueLocked
     ) public view virtual returns (uint256 reserveThreshold);
 
     /**
@@ -158,7 +166,7 @@ abstract contract VaultBase is ERC4626, Ownable {
     /**
      * Get amount of uninvested assets.
      */
-    function getReserves() public view virtual returns (uint256 reserves);
+    function getReserves() public view virtual returns (uint256);
 
     /**
      * Check that user can withdraw the assets and return how much it will cost them in shares.
@@ -172,6 +180,11 @@ abstract contract VaultBase is ERC4626, Ownable {
     ) public view virtual returns (uint256 shares);
 
     // ====== Internal Methods ====== //
+
+    /**
+     * Return the _asset ERC4626 variable.
+     */
+    function getAssetContract() internal view virtual returns (IERC20);
 
     /**
      * Initiate withdrawal from EigenLayer.
@@ -215,7 +228,9 @@ abstract contract VaultBase is ERC4626, Ownable {
      */
     function updateVaultConfig(
         VaultConfig memory vaultConfigArg
-    ) public virtual onlyOwner;
+    ) public onlyOwner {
+        vaultConfig = vaultConfigArg;
+    }
 
     // ====== Masked Methods ====== //
 

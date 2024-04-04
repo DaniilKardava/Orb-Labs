@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.12;
 
+import {IStrategy} from "../lib/eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+
 contract EigenWithdrawalQueue {
     /// COPIED FROM EIGENLAYER
     struct WithdrawerAndNonce {
@@ -44,10 +46,14 @@ contract EigenWithdrawalQueue {
      * @param queuedWithdrawal withdrawal object used to complete withdrawal.
      */
     function enqueue(
-        bytes32 memory root,
+        bytes32 root,
         QueuedWithdrawal memory queuedWithdrawal
     ) public virtual {
-        Node memory newNode = Node(tailNode.next + 1, root, queuedWithdrawal);
+        Node memory newNode = Node(
+            withdrawals[tailIndex].next + 1,
+            root,
+            queuedWithdrawal
+        );
 
         int256 freeIndex = withdrawals[tailIndex].next;
         withdrawals[freeIndex] = newNode;
@@ -61,10 +67,12 @@ contract EigenWithdrawalQueue {
      */
     function dequeue() public virtual {
         require(getLength() > 0, "Empty queue!");
-        headNode = withdrawals[headNode.next];
+
+        int256 tempHeadIndex = withdrawals[headIndex].next;
+
         delete withdrawals[headIndex];
 
-        headIndex++;
+        headIndex = tempHeadIndex;
         length--;
     }
 
@@ -89,7 +97,6 @@ contract EigenWithdrawalQueue {
         public
         returns (uint256 pendingWithdrawals)
     {
-        uint256 pendingWithdrawals;
         int256 index = headIndex;
         while (withdrawals[index].order.depositor != address(0)) {
             pendingWithdrawals += withdrawals[index].order.shares[0];
