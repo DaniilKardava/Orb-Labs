@@ -1,44 +1,23 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.12;
 
-import {IERC20} from "../../lib/OpenZepellin/contracts/token/ERC20/IERC20.sol";
-import {ERC20} from "../../lib/OpenZepellin/contracts/token/ERC20/ERC20.sol";
-import {ERC4626} from "../../lib/OpenZepellin/contracts/token/ERC20/extensions/ERC4626.sol";
-import {Ownable} from "../../lib/OpenZepellin/contracts/access/Ownable.sol";
-import {IStrategy} from "../../lib/eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {StrategyManager} from "../../lib/eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
+import {ERC4626, ERC20, IERC20Metadata} from "../../lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/token/ERC20/extensions/ERC4626.sol";
+import {Ownable} from "../../lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+
+// IERC20 not convertable to IERC20 even when importing from eigen-layer OZ dependency. Only accepted solution is importing from StrategyManager.
+import {StrategyManager, IStrategy, IStrategyManager, IERC20, SafeERC20} from "../../lib/eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
+
 import {VaultWithdrawalQueue} from "../VaultWithdrawalQueue.sol";
 import {VaultPriorityWithdrawalQueue} from "../VaultPriorityWithdrawalQueue.sol";
 import {EigenWithdrawalQueue} from "../EigenWithdrawalQueue.sol";
+
 import {DSMath} from "../../lib/ds-math/src/math.sol";
 
 /**
  * Abstract Vault contract for token and EigenLayer strategy.
  * All value quantities are stored in Wad units.
  */
-abstract contract VaultBase is ERC4626, Ownable {
-    /// COPIED FROM EIGENLAYER
-    struct WithdrawerAndNonce {
-        address withdrawer;
-        uint96 nonce;
-    }
-
-    /**
-     * COPIED FROM EIGENLAYER
-     * Struct type used to specify an existing queued withdrawal. Rather than storing the entire struct, only a hash is stored.
-     * In functions that operate on existing queued withdrawals -- e.g. `startQueuedWithdrawalWaitingPeriod` or `completeQueuedWithdrawal`,
-     * the data is resubmitted and the hash of the submitted data is computed by `calculateWithdrawalRoot` and checked against the
-     * stored hash in order to confirm the integrity of the submitted data.
-     */
-    struct QueuedWithdrawal {
-        IStrategy[] strategies;
-        uint256[] shares;
-        address depositor;
-        WithdrawerAndNonce withdrawerAndNonce;
-        uint32 withdrawalStartBlock;
-        address delegatedAddress;
-    }
-
+abstract contract VaultBase is ERC4626, Ownable, DSMath {
     /**
      * Contains EigenLayer proxy contracts for the strategy manager and the particular strategy.
      */
@@ -53,15 +32,16 @@ abstract contract VaultBase is ERC4626, Ownable {
      */
     struct VaultConfig {
         uint256 reserveRequirement;
-        address depositThreshold;
+        uint256 depositThreshold;
     }
 
     VaultConfig public vaultConfig;
     EigenContracts public eigenContracts;
+    uint256 public nonce;
+
     VaultPriorityWithdrawalQueue internal vaultPriorityWithdrawalQueue;
     VaultWithdrawalQueue internal vaultWithdrawalQueue;
     EigenWithdrawalQueue internal eigenWithdrawalQueue;
-    uint256 public nonce;
 
     /**
      * Create a Vault with a depositable token in exchange for a Vault managed IOU.
@@ -74,7 +54,7 @@ abstract contract VaultBase is ERC4626, Ownable {
      * @param vaultOwner Vault owner.
      */
     constructor(
-        IERC20 asset,
+        IERC20Metadata asset,
         string memory name,
         string memory symbol,
         VaultConfig memory vaultConfigArg,

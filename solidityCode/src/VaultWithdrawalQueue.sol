@@ -5,7 +5,7 @@ contract VaultWithdrawalQueue {
     struct WithdrawalOrder {
         address account;
         uint256 assets;
-        uint256 nonce;
+        uint256 uid;
     }
 
     struct Node {
@@ -15,25 +15,32 @@ contract VaultWithdrawalQueue {
 
     uint256 internal length;
     int256 internal headIndex;
-    int256 internal tailIndex;
+    int256 public tailIndex;
 
     mapping(int256 => Node) internal withdrawals;
 
-    constructor() {}
+    constructor() {
+        length = 0;
+        headIndex = 0;
+        tailIndex = 0;
+    }
 
     /**
      * Add element to the end of queue.
      * @param account Address withdrawing.
      * @param assets Amount of assets to withdraw.
+     * @param uid Unique order identifier
      */
     function enqueue(
         address account,
         uint256 assets,
-        uint256 nonce
+        uint256 uid
     ) public virtual {
+        require(account != address(0), "Cannot send to void!");
+
         Node memory newNode = Node(
             withdrawals[tailIndex].next + 1,
-            WithdrawalOrder(account, assets, nonce)
+            WithdrawalOrder(account, assets, uid)
         );
 
         int256 freeIndex = withdrawals[tailIndex].next;
@@ -70,13 +77,14 @@ contract VaultWithdrawalQueue {
 
     /**
      * Removes a specific element from the queue.
+     * @return bool Whether item was in queue.
      */
-    function removeOrder(uint256 nonce) public {
+    function removeOrder(uint256 uid) public returns (bool) {
         int256 prevIndex;
         int256 index = headIndex;
         while (
             (withdrawals[index].order.account != address(0)) &&
-            (withdrawals[index].order.nonce != nonce)
+            (withdrawals[index].order.uid != uid)
         ) {
             prevIndex = index;
             index = withdrawals[index].next;
@@ -94,6 +102,11 @@ contract VaultWithdrawalQueue {
                 withdrawals[prevIndex].next = withdrawals[index].next;
                 delete withdrawals[index];
             }
+            length--;
+
+            return true;
         }
+
+        return false;
     }
 }

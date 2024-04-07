@@ -1,35 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.12;
 
-import {IStrategy} from "../lib/eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IStrategy, IStrategyManager} from "../lib/eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
 
 contract EigenWithdrawalQueue {
-    /// COPIED FROM EIGENLAYER
-    struct WithdrawerAndNonce {
-        address withdrawer;
-        uint96 nonce;
-    }
-
-    /**
-     * COPIED FROM EIGENLAYER
-     * Struct type used to specify an existing queued withdrawal. Rather than storing the entire struct, only a hash is stored.
-     * In functions that operate on existing queued withdrawals -- e.g. `startQueuedWithdrawalWaitingPeriod` or `completeQueuedWithdrawal`,
-     * the data is resubmitted and the hash of the submitted data is computed by `calculateWithdrawalRoot` and checked against the
-     * stored hash in order to confirm the integrity of the submitted data.
-     */
-    struct QueuedWithdrawal {
-        IStrategy[] strategies;
-        uint256[] shares;
-        address depositor;
-        WithdrawerAndNonce withdrawerAndNonce;
-        uint32 withdrawalStartBlock;
-        address delegatedAddress;
-    }
-
     struct Node {
         int256 next;
         bytes32 root;
-        QueuedWithdrawal order;
+        IStrategyManager.QueuedWithdrawal order;
     }
 
     uint256 internal length;
@@ -38,7 +16,11 @@ contract EigenWithdrawalQueue {
 
     mapping(int256 => Node) internal withdrawals;
 
-    constructor() {}
+    constructor() {
+        length = 0;
+        headIndex = 0;
+        tailIndex = 0;
+    }
 
     /**
      * Add element to the end of queue.
@@ -47,8 +29,8 @@ contract EigenWithdrawalQueue {
      */
     function enqueue(
         bytes32 root,
-        QueuedWithdrawal memory queuedWithdrawal
-    ) public virtual {
+        IStrategyManager.QueuedWithdrawal memory queuedWithdrawal
+    ) public {
         Node memory newNode = Node(
             withdrawals[tailIndex].next + 1,
             root,
@@ -65,7 +47,7 @@ contract EigenWithdrawalQueue {
     /**
      * Removes the first withdrawal request from the queue.
      */
-    function dequeue() public virtual {
+    function dequeue() public {
         require(getLength() > 0, "Empty queue!");
 
         int256 tempHeadIndex = withdrawals[headIndex].next;
@@ -86,7 +68,7 @@ contract EigenWithdrawalQueue {
     /**
      * Returns queue length.
      */
-    function getLength() public returns (uint256) {
+    function getLength() public view returns (uint256) {
         return length;
     }
 
@@ -95,6 +77,7 @@ contract EigenWithdrawalQueue {
      */
     function sumPendingWithdrawalsInShares()
         public
+        view
         returns (uint256 pendingWithdrawals)
     {
         int256 index = headIndex;

@@ -15,8 +15,10 @@ contract VaultPriorityWithdrawalQueue is VaultWithdrawalQueue {
     function enqueue(
         address account,
         uint256 assets,
-        uint256 nonce
+        uint256 uid
     ) public override {
+        require(account != address(0), "Cannot send to void!");
+
         int256 index = headIndex;
         int256 prevIndex;
 
@@ -32,7 +34,7 @@ contract VaultPriorityWithdrawalQueue is VaultWithdrawalQueue {
             // End of Queue
             Node memory newNode = Node(
                 withdrawals[tailIndex].next + 1, // Keep pointing to void.
-                WithdrawalOrder(account, assets, nonce)
+                WithdrawalOrder(account, assets, uid)
             );
             int256 freeIndex = withdrawals[tailIndex].next;
             withdrawals[freeIndex] = newNode;
@@ -40,7 +42,7 @@ contract VaultPriorityWithdrawalQueue is VaultWithdrawalQueue {
         } else {
             Node memory newNode = Node(
                 index,
-                WithdrawalOrder(account, assets, nonce)
+                WithdrawalOrder(account, assets, uid)
             );
             int256 freeIndex = withdrawals[tailIndex].next;
             withdrawals[freeIndex] = newNode;
