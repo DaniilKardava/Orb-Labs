@@ -10,9 +10,9 @@ contract EigenWithdrawalQueue {
         IStrategyManager.QueuedWithdrawal order;
     }
 
-    uint256 internal length;
-    int256 internal headIndex;
-    int256 internal tailIndex;
+    uint256 public length;
+    int256 public headIndex;
+    int256 public tailIndex;
 
     mapping(int256 => Node) internal withdrawals;
 

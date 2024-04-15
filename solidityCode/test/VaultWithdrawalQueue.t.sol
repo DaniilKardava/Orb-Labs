@@ -81,6 +81,7 @@ contract TestVaultQ is Test {
         handler = new Handler(queue);
 
         targetContract(address(handler));
+        // rng hash
     }
 
     /// Test that the length of the queue is the net of enqueue, dequeue, and remove calls.
@@ -94,9 +95,10 @@ contract TestVaultQ is Test {
     /// Test that the tail index is the sum of all enqueue calls.
     function invariant_tail_index() public {
         int256 tailIndex = stdstore
-            .target(address(handler))
+            .target(address(queue))
             .sig("tailIndex")
             .read_int(); // Read private variable
+        //make public
         assertEq(int256(handler.enqueueCalls()), tailIndex);
     }
 }

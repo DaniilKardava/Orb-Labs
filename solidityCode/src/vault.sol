@@ -21,7 +21,6 @@ contract Vault is VaultBase {
             vaultOwner
         )
     {}
-
     function queueVaultWithdrawal(
         uint256 assets,
         address receiver,

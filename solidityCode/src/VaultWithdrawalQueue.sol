@@ -13,11 +13,11 @@ contract VaultWithdrawalQueue {
         WithdrawalOrder order;
     }
 
-    uint256 internal length;
-    int256 internal headIndex;
+    uint256 public length;
+    int256 public headIndex;
     int256 public tailIndex;
 
-    mapping(int256 => Node) internal withdrawals;
+    mapping(int256 => Node) public withdrawals;
 
     constructor() {
         length = 0;
