@@ -86,7 +86,7 @@ contract TestVaultPriorityQueue is Test {
      */
     function invariant_traversable() public view {
         int256 idx = priorityQueue.headIndex();
-        // it takes length - 1 steps to get from start to finish of queue, so begin at 1.
+        // It takes length - 1 steps to get from start to finish of queue, so begin at 1.
         for (uint256 i = 1; i < priorityQueue.length(); i++) {
             (idx, ) = priorityQueue.withdrawals(idx);
         }
