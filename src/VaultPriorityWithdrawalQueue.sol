@@ -11,7 +11,7 @@ contract VaultPriorityWithdrawalQueue is VaultWithdrawalQueue {
     constructor() VaultWithdrawalQueue() {}
 
     /**
-     * Organize withdrawal requests by size.
+     * Override VaultWithdrawalQueue to maintain ascending order by withdrawal amount.
      */
     function enqueue(
         address account,

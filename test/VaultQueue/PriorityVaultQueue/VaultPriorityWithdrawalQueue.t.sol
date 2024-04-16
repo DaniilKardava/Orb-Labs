@@ -7,14 +7,18 @@ import {RandomGenerator} from "../../RandomGenerator.sol";
 import {VaultWithdrawalQueue} from "../../../src/VaultWithdrawalQueue.sol";
 
 /**
- * Test the vault withdrawal queue. Many function asserts are written inside the handler.
+ * Test the VaultPriorityWithdrawalQueue.
+ * Function fuzz tests are done inside the handler.
  */
 contract TestVaultPriorityQueue is Test {
     VaultPriorityWithdrawalQueue internal priorityQueue;
     Handler internal handler;
     RandomGenerator internal randomGenerator;
-    uint256 internal constant MAX_INITIAL_Q = 10;
+    uint256 internal constant INITIAL_Q_SIZE = 10;
 
+    /**
+     * Create a queue and handler instance. Populate the queue with random entries.
+     */
     function setUp() public {
         priorityQueue = new VaultPriorityWithdrawalQueue();
 
@@ -25,7 +29,7 @@ contract TestVaultPriorityQueue is Test {
 
         // Populate queue with random entries.
         uint256 salt = 123143329;
-        for (uint256 i = 0; i < MAX_INITIAL_Q; i++) {
+        for (uint256 i = 0; i < INITIAL_Q_SIZE; i++) {
             // Generate random values
             address rAddress = randomGenerator.randomAddress(salt);
             uint256 rAmount = randomGenerator.randomUint(salt);
@@ -40,12 +44,12 @@ contract TestVaultPriorityQueue is Test {
     /**
      * Check that the queue accurately tracks total pending withdrawals.
      */
-    function invariant_sum_deposits() public view {
+    function invariant_sum_withdrawals() public view {
         assertGe(priorityQueue.sumPendingWithdrawals(), handler.netDeposits());
     }
 
     /**
-     * Test that objects are in order of deposits.
+     * Test that objects are in ascending order.
      */
     function invariant_in_order() public view {
         (
@@ -59,7 +63,7 @@ contract TestVaultPriorityQueue is Test {
                 0
             );
 
-        // it takes length - 1 steps to get from start to finish of queue, so begin at 1.
+        // It takes length - 1 steps to get from start to finish of queue, so begin at 1.
         for (uint256 i = 1; i < priorityQueue.length(); i++) {
             (idx, newOrder) = priorityQueue.withdrawals(idx);
             assertGe(newOrder.assets, prevOrder.assets);
@@ -78,9 +82,9 @@ contract TestVaultPriorityQueue is Test {
     }
 
     /**
-     * Checks that queue can be traversed from head to tail in exactly "length" steps
+     * Checks that queue can be traversed from head to tail in exactly "length" steps.
      */
-    function invariant_can_traverse() public view {
+    function invariant_traversable() public view {
         int256 idx = priorityQueue.headIndex();
         // it takes length - 1 steps to get from start to finish of queue, so begin at 1.
         for (uint256 i = 1; i < priorityQueue.length(); i++) {

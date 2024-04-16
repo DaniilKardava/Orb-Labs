@@ -2,8 +2,12 @@
 pragma solidity ^0.8.12;
 
 import {EigenWithdrawalQueue, IDelegationManager} from "../../src/EigenWithdrawalQueue.sol";
-import {Test, console} from "../../lib/forge-std/src/Test.sol";
+import {Test} from "../../lib/forge-std/src/Test.sol";
 
+/**
+ * Handler for EigenWithdrawalQueue.
+ * Additionally, runs fuzz tests for functions during invariant testing.
+ */
 contract Handler is Test {
     uint256 public dequeueCalls;
     uint256 public enqueueCalls;
@@ -18,17 +22,17 @@ contract Handler is Test {
     }
 
     /**
-     * Enqueue order, increment calls to enqueue, and append removable id.
+     * Enqueue an item and assert that the new item is at the tail.
      */
     function enqueue(
         bytes32 root,
         IDelegationManager.Withdrawal memory order
     ) public {
-        // Fuzzer will create arbitrary length arrays, but only considering first elements as in practice.
+        // Fuzzer will create arbitrary length arrays, but pretend that the array has length 1.
         order.shares[0] = uint256(uint160(order.shares[0])); // Format to prevent overflow.
 
         queue.enqueue(root, order);
-        // doesnt execute on revert
+        // Doesnt execute on revert
         enqueueCalls++;
 
         // Assert new value is at tailIndex
@@ -39,15 +43,14 @@ contract Handler is Test {
             IDelegationManager.Withdrawal memory tailOrder
         ) = queue.withdrawals(tailIndex);
 
-        // For simplicity just assert the roots
+        // For simplicity just assert the roots are equal.
         assertEq(tailRoot, root);
 
         netDeposits += tailOrder.shares[0];
     }
 
     /**
-     * Dequeue order, increment calls to dequeue, and remove id of item from removable list.
-     * Same implementation for priority and regular queue.
+     * Dequeue an item and assert that the second item is now first.
      */
     function dequeue() public {
         IDelegationManager.Withdrawal memory oldHeadOrder = queue.peek().order;
@@ -57,13 +60,13 @@ contract Handler is Test {
         // Remove head element
         queue.dequeue();
 
-        // doesnt execute on revert
+        // Doesn't execute on revert
         dequeueCalls++;
 
         // Check that the second item is now the first.
         (, bytes32 newHeadRoot, ) = queue.withdrawals(queue.headIndex());
 
-        // For simplicity just assert the roots.
+        // For simplicity just assert the roots are equal.
         assertEq(secondRoot, newHeadRoot);
 
         netDeposits -= oldHeadOrder.shares[0];

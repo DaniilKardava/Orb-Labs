@@ -9,14 +9,18 @@ import {Handler} from "./Handler.sol";
 import {RandomGenerator} from "../RandomGenerator.sol";
 
 /**
- * Test the vault withdrawal queue. Many function asserts are written inside the handler.
+ * Test the Eigenlayer withdrawal queue.
+ * Function fuzz tests are done inside the handler.
  */
 contract TestEigenQueue is Test {
     EigenWithdrawalQueue internal queue;
     Handler internal handler;
     RandomGenerator internal randomGenerator;
-    uint256 internal constant MAX_INITIAL_Q = 10;
+    uint256 internal constant INITIAL_Q_SIZE = 10;
 
+    /**
+     * Create a queue and handler instance. Populate the queue with random entries.
+     */
     function setUp() public {
         queue = new EigenWithdrawalQueue();
         handler = new Handler(queue);
@@ -26,7 +30,7 @@ contract TestEigenQueue is Test {
 
         // Populate queue with random entries.
         uint256 salt = 123143329;
-        for (uint256 i = 0; i < MAX_INITIAL_Q; i++) {
+        for (uint256 i = 0; i < INITIAL_Q_SIZE; i++) {
             // Build random withdrawal struct.
             bytes32 rBytes = bytes32(randomGenerator.randomUint(salt));
 
@@ -56,12 +60,12 @@ contract TestEigenQueue is Test {
     /**
      * Check that the queue accurately tracks total pending withdrawals.
      */
-    function invariant_sum_deposits() public view {
+    function invariant_sum_withdrawals() public view {
         assertGe(queue.sumPendingWithdrawalsInShares(), handler.netDeposits());
     }
 
     /**
-     *Test that the length of the queue is the net of enqueue, dequeue.
+     * Test that the length of the queue is the net of enqueue and dequeue actions.
      */
     function invariant_queue_length() public view {
         uint256 netCalls = handler.enqueueCalls() - handler.dequeueCalls();
@@ -71,9 +75,9 @@ contract TestEigenQueue is Test {
     /**
      * Checks that queue can be traversed from head to tail in exactly "length" steps
      */
-    function invariant_can_traverse() public view {
+    function invariant_traversable() public view {
         int256 idx = queue.headIndex();
-        // it takes length - 1 steps to get from start to finish of queue, so begin at 1.
+        // It takes length - 1 steps to get from start to finish of queue, so begin at 1.
         for (uint256 i = 1; i < queue.length(); i++) {
             (idx, , ) = queue.withdrawals(idx);
         }
@@ -83,7 +87,7 @@ contract TestEigenQueue is Test {
     /**
      * Assert that tail is always pointing to void. Then elements can be added without concern of overwriting existing data.
      */
-    function invariant_tail_points_void() public view {
+    function invariant_tail_points_to_void() public view {
         (int256 freeIdx, , ) = queue.withdrawals(queue.tailIndex());
         (, bytes32 root, ) = queue.withdrawals(freeIdx);
         assertEq(root, bytes32(0));

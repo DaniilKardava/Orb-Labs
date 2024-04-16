@@ -9,14 +9,18 @@ import {Handler} from "./Handler.sol";
 import {RandomGenerator} from "../RandomGenerator.sol";
 
 /**
- * Test the vault withdrawal queue. Many function asserts are written inside the handler.
+ * Test the VaultWithdrawalQueue.
+ * Function fuzz tests are done inside the handler.
  */
 contract TestVaultQueue is Test {
     VaultWithdrawalQueue internal queue;
     Handler internal handler;
     RandomGenerator internal randomGenerator;
-    uint256 internal constant MAX_INITIAL_Q = 10;
+    uint256 internal constant INITIAL_Q_SIZE = 10;
 
+    /**
+     * Create a queue and handler instance. Populate the queue with random entries.
+     */
     function setUp() public {
         queue = new VaultWithdrawalQueue();
         handler = new Handler(queue);
@@ -26,7 +30,7 @@ contract TestVaultQueue is Test {
 
         // Populate queue with random entries.
         uint256 salt = 123143329;
-        for (uint256 i = 0; i < MAX_INITIAL_Q; i++) {
+        for (uint256 i = 0; i < INITIAL_Q_SIZE; i++) {
             // Generate random values
             address rAddress = randomGenerator.randomAddress(salt);
             uint256 rAmount = randomGenerator.randomUint(salt);
@@ -38,7 +42,9 @@ contract TestVaultQueue is Test {
         }
     }
 
-    /// Test that the length of the queue is the net of enqueue, dequeue, and remove calls.
+    /**
+     * Test that the length of the queue is the net of enqueue, dequeue, and remove calls.
+     */
     function invariant_queue_length() public view {
         uint256 netCalls = handler.enqueueCalls() -
             handler.removeCalls() -
@@ -46,18 +52,22 @@ contract TestVaultQueue is Test {
         assertEq(queue.length(), netCalls);
     }
 
-    /// Checks that queue can be traversed from head to tail in exactly "length" steps
-    function invariant_can_traverse() public view {
+    /**
+     * Checks that queue can be traversed from head to tail in exactly "length" steps.
+     */
+    function invariant_traversable() public view {
         int256 idx = queue.headIndex();
-        // it takes length - 1 steps to get from start to finish of queue, so begin at 1.
+        // It takes length - 1 steps to get from start to finish of queue, so begin at 1.
         for (uint256 i = 1; i < queue.length(); i++) {
             (idx, ) = queue.withdrawals(idx);
         }
         assertEq(idx, queue.tailIndex());
     }
 
-    /// Assert that tail is always pointing to void. Then elements can be added without concern of overwriting existing data.
-    function invariant_tail_points_void() public view {
+    /**
+     *  Assert that tail is always pointing to void. Then elements can be added without concern of overwriting existing data.
+     */
+    function invariant_tail_points_to_void() public view {
         (int256 freeIdx, ) = queue.withdrawals(queue.tailIndex());
         (, VaultWithdrawalQueue.WithdrawalOrder memory order) = queue
             .withdrawals(freeIdx);

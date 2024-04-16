@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.12;
 
-import {Test, console} from "../../../lib/forge-std/src/Test.sol";
-import {VaultPriorityWithdrawalQueue} from "../../../src/VaultPriorityWithdrawalQueue.sol";
-import {VaultWithdrawalQueue} from "../../../src/VaultWithdrawalQueue.sol";
+import {Test} from "../../../lib/forge-std/src/Test.sol";
+import {VaultPriorityWithdrawalQueue, VaultWithdrawalQueue} from "../../../src/VaultPriorityWithdrawalQueue.sol";
 
+/**
+ * Handler for VaultPriorityWithdrawalQueue.
+ * Additionally, runs fuzz tests for functions during invariant testing.
+ */
 contract Handler is Test {
     uint256 public dequeueCalls;
     uint256 public removeCalls;
@@ -23,7 +26,7 @@ contract Handler is Test {
     }
 
     /**
-     * Enqueue order, increment calls to enqueue, and append removable id.
+     * Enqueue order. Tag it as 'removable'.
      */
     function enqueue(
         address account,
@@ -34,15 +37,16 @@ contract Handler is Test {
         uint256 assets = uint256(assetsCapped);
 
         queue.enqueue(account, assets, uid);
-        // doesnt execute on revert
+
+        // Doesn't execute on revert
         enqueueCalls++;
         removable.push(uid);
         netDeposits += assets;
     }
 
     /**
-     * Dequeue order, increment calls to dequeue, and remove id of item from removable list.
-     * Same implementation for priority and regular queue.
+     * Dequeue order. Untag it as 'removable'.
+     * Assert that the second order is now first.
      */
     function dequeue() public {
         VaultWithdrawalQueue.WithdrawalOrder memory oldHeadOrder = queue
@@ -55,7 +59,7 @@ contract Handler is Test {
         // Remove head element
         queue.dequeue();
 
-        // doesnt execute on revert
+        // Doesn't execute on revert
         dequeueCalls++;
 
         // Remove order from list of removables.
@@ -73,8 +77,8 @@ contract Handler is Test {
     }
 
     /**
-     * Remove an element from queue by id. Increment removeCalls. Remove element from removable list.
-     * Same implementation for priority and regular queue.
+     * Remove an order by id.
+     * Assert that the order is not in queue anymore.
      */
     function removeOrder(uint256 uid) public {
         require(removable.length > 0, "Queue is empty!");
@@ -82,10 +86,8 @@ contract Handler is Test {
         uid = removable[idx];
         popIdx(idx);
 
-        queue.tailIndex();
         VaultWithdrawalQueue.WithdrawalOrder memory removedOrder = queue
             .removeOrder(uid);
-        queue.tailIndex();
 
         if (removedOrder.account != address(0)) {
             removeCalls++;
