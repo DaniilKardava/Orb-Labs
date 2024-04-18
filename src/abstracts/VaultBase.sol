@@ -62,6 +62,10 @@ abstract contract VaultBase is ERC4626, Ownable, DSMath {
         EigenContracts memory eigenContractsArg,
         address vaultOwner
     ) ERC4626(asset) ERC20(name, symbol) {
+        require(
+            address(eigenContractsArg.strategyProxy.underlyingToken()) ==
+                address(asset)
+        ); // Vault stores strategy asset.
         transferOwnership(vaultOwner);
         vaultConfig = vaultConfigArg;
         eigenContracts = eigenContractsArg;

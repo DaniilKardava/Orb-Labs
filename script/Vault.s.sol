@@ -5,6 +5,9 @@ import {Script, console} from "forge-std/Script.sol";
 import "../src/Vault.sol";
 
 contract VaultScript is Script {
+    /**
+     * Vault initialization arguments.
+     */
     struct VaultArguments {
         IERC20Metadata asset;
         string name;
@@ -17,6 +20,7 @@ contract VaultScript is Script {
     VaultArguments public vaultArguments;
 
     function setUp() public {
+        // Set targets and thresholds for Eigenlayer deposits and withdrawable reserves.
         uint256 reserveRequirement = 10 ** 18 / 10; // 10%
         uint256 depositThreshold = 10 ** 18 / 5; // 20%
 
@@ -25,29 +29,30 @@ contract VaultScript is Script {
             depositThreshold: depositThreshold
         });
 
-        // Lido Strategy, Holesky addresses
+        // Important Addresses
+        address delegationManagerProxy = 0xA44151489861Fe9e3055d95adC98FbD462B948e7;
+        address lidoStrategyProxy = 0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3;
+        address strategyManagerProxy = 0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6;
+        address lidoETH = 0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034;
+        address vaultOwner = 0x3B3C3f31DAe1FD6d056f67fB2D0ea2FD3217AD67;
+
+        // Eigenlayer's Lido strategy
         VaultBase.EigenContracts memory eigenContracts = VaultBase
             .EigenContracts({
                 delegationManagerProxy: IDelegationManager(
-                    0xA44151489861Fe9e3055d95adC98FbD462B948e7
+                    delegationManagerProxy
                 ),
-                strategyProxy: IStrategy(
-                    0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3
-                ),
-                strategyManagerProxy: StrategyManager(
-                    0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6
-                )
+                strategyProxy: IStrategy(lidoStrategyProxy),
+                strategyManagerProxy: StrategyManager(strategyManagerProxy)
             });
 
-        address stETH = 0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034;
-
         vaultArguments = VaultArguments({
-            asset: IERC20Metadata(stETH),
+            asset: IERC20Metadata(lidoETH),
             name: "OA Ethereum",
             symbol: "oaETH",
             vaultConfigArg: vaultConfig,
             eigenContractsArg: eigenContracts,
-            vaultOwner: 0x3B3C3f31DAe1FD6d056f67fB2D0ea2FD3217AD67
+            vaultOwner: vaultOwner
         });
     }
 
